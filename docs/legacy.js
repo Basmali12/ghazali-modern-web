@@ -121,7 +121,7 @@
             } else alert('بيانات الدخول خاطئة');
         }
 
-        function init() { renderSidebar(); setSidebarOpen(false); navigate('dashboard'); }
+        function init() { renderSidebar(); navigate('dashboard'); }
         function updateDatalist() {
             const indexedContacts = [...state.contacts].sort((a, b) => a.name.localeCompare(b.name, 'ar', { sensitivity: 'base' }));
             document.getElementById('global-contacts-list').innerHTML = indexedContacts.map(c => `<option value="${c.name}">`).join('');
@@ -146,24 +146,7 @@
             }).join('');
         }
 
-        function setSidebarOpen(open) {
-            const sidebar = document.getElementById('sidebar');
-            const toggle = document.getElementById('nav-toggle');
-            document.body.classList.toggle('sidebar-open', open);
-            if(sidebar) sidebar.setAttribute('aria-hidden', String(!open));
-            if(toggle) {
-                toggle.setAttribute('aria-expanded', String(open));
-                toggle.setAttribute('aria-label', open ? 'إغلاق قائمة التبويبات' : 'فتح قائمة التبويبات');
-            }
-            if(open) setTimeout(() => document.querySelector('#nav-menu .nav-item.active, #nav-menu .nav-item')?.focus(), 80);
-        }
-
-        function toggleSidebar() { setSidebarOpen(!document.body.classList.contains('sidebar-open')); }
-        function closeSidebar() { setSidebarOpen(false); }
-        document.addEventListener('keydown', event => { if(event.key === 'Escape') closeSidebar(); });
-
         function navigate(tab) {
-            closeSidebar();
             if (tab === 'settings') { document.getElementById('settings-lock-modal').classList.remove('hidden'); return; }
             state.activeTab = tab; renderSidebar(); setTimeout(() => { renderPage(); }, 10);
         }
@@ -623,7 +606,7 @@
         function renderReports(m) {
             const today = new Date().toISOString().split('T')[0];
             m.innerHTML = `<div class="page-header no-print"><div class="page-title">التقارير</div><div class="page-actions"><button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ طباعة</button><button class="btn btn-success btn-sm whatsapp-btn" onclick="shareViaWhatsApp('التقارير')">🟢 واتساب</button></div></div>
-                <div class="card no-print" style="display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:8px; align-items:end;">
+                <div class="card no-print report-filters" style="display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:8px; align-items:end;">
                     <div><label>من</label><input type="date" id="rep-from" value="${today}" style="margin:0;"></div>
                     <div><label>إلى</label><input type="date" id="rep-to" value="${today}" style="margin:0;"></div>
                     <div><label>بحث بالاسم</label><input type="text" id="rep-search" oninput="drawRep(window.currentRepType)" style="margin:0;"></div>

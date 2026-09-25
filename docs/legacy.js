@@ -121,7 +121,7 @@
             } else alert('بيانات الدخول خاطئة');
         }
 
-        function init() { renderSidebar(); navigate('dashboard'); }
+        function init() { renderSidebar(); setSidebarOpen(false); navigate('dashboard'); }
         function updateDatalist() {
             const indexedContacts = [...state.contacts].sort((a, b) => a.name.localeCompare(b.name, 'ar', { sensitivity: 'base' }));
             document.getElementById('global-contacts-list').innerHTML = indexedContacts.map(c => `<option value="${c.name}">`).join('');
@@ -146,7 +146,24 @@
             }).join('');
         }
 
+        function setSidebarOpen(open) {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.getElementById('nav-toggle');
+            document.body.classList.toggle('sidebar-open', open);
+            if(sidebar) sidebar.setAttribute('aria-hidden', String(!open));
+            if(toggle) {
+                toggle.setAttribute('aria-expanded', String(open));
+                toggle.setAttribute('aria-label', open ? 'إغلاق قائمة التبويبات' : 'فتح قائمة التبويبات');
+            }
+            if(open) setTimeout(() => document.querySelector('#nav-menu .nav-item.active, #nav-menu .nav-item')?.focus(), 80);
+        }
+
+        function toggleSidebar() { setSidebarOpen(!document.body.classList.contains('sidebar-open')); }
+        function closeSidebar() { setSidebarOpen(false); }
+        document.addEventListener('keydown', event => { if(event.key === 'Escape') closeSidebar(); });
+
         function navigate(tab) {
+            closeSidebar();
             if (tab === 'settings') { document.getElementById('settings-lock-modal').classList.remove('hidden'); return; }
             state.activeTab = tab; renderSidebar(); setTimeout(() => { renderPage(); }, 10);
         }
@@ -196,9 +213,20 @@
 
         function navNext(e, nextId) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById(nextId).focus(); } }
 
+        function transactionActionButtons(id) {
+            const safeId = JSON.stringify(id);
+            return `<div class="row-actions no-print"><button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation();openEdit(${safeId}, 'tx')" title="تعديل المعاملة" aria-label="تعديل المعاملة">✏️</button><button type="button" class="btn btn-danger btn-sm" onclick="event.stopPropagation();delTx(${safeId})" title="حذف المعاملة" aria-label="حذف المعاملة">🗑️</button></div>`;
+        }
+
+        function contactActionButtons(id) {
+            const safeId = JSON.stringify(id);
+            return `<div class="row-actions no-print"><button type="button" class="btn btn-primary btn-sm" onclick="event.stopPropagation();openEdit(${safeId}, 'contact')" title="تعديل الاسم" aria-label="تعديل الاسم">✏️</button><button type="button" class="btn btn-danger btn-sm" onclick="event.stopPropagation();delC(${safeId})" title="حذف الاسم" aria-label="حذف الاسم">🗑️</button></div>`;
+        }
+
         function renderDashboard(m) {
             const invoices = state.transactions.filter(t=>t.type==='فاتورة').sort((a,b)=>new Date(b.date)-new Date(a.date));
             const contactsMap={}; state.contacts.forEach(c=>contactsMap[c.id]=c.name);
+            const fiscalYear = escapeHTML(state.settings?.fiscalYear || new Date().getFullYear());
             const today=new Date().toLocaleDateString('en-CA');
             const todaySales=invoices.filter(t=>String(t.date).startsWith(today)).reduce((a,t)=>a+Number(t.amount||0),0);
             const totalSales=invoices.reduce((a,t)=>a+Number(t.amount||0),0);
@@ -209,7 +237,7 @@
             const months=[]; for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1); const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); const val=invoices.filter(t=>String(t.date).startsWith(key)).reduce((a,t)=>a+Number(t.amount||0),0); months.push({name:d.toLocaleDateString('ar-IQ',{month:'short'}),val});}
             const max=Math.max(...months.map(x=>x.val),1);
             m.innerHTML=`<div class="dashboard-shell">
-              <div class="dash-top"><div class="dash-welcome">مرحباً بك في نظام الغزالي للمحاسبة والمخزون</div><div class="dash-date">◷ &nbsp; ${now.toLocaleDateString('en-CA')}<br>${now.toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'})}</div></div>
+              <div class="dash-top"><div class="dash-welcome">مرحباً بك في نظام الغزالي للمحاسبة والمخزون <span style="display:inline-block; margin-right:8px; padding:3px 10px; border-radius:999px; background:#eceefe; color:#343170; font-size:.76rem;">السنة المالية: ${fiscalYear}</span></div><div class="dash-date">◷ &nbsp; ${now.toLocaleDateString('en-CA')}<br>${now.toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'})}</div></div>
               <div class="dash-cards">
                 <div class="dash-card"><div class="dash-card-icon">◉</div><div class="dash-card-text"><div class="dash-card-label">إجمالي الأرصدة لنا</div><div class="dash-card-value">${deb.toLocaleString()}</div><div class="dash-card-line"></div></div></div>
                 <div class="dash-card"><div class="dash-card-icon">🛒</div><div class="dash-card-text"><div class="dash-card-label">مبيعات اليوم</div><div class="dash-card-value">${todaySales.toLocaleString()}</div><div class="dash-card-line"></div></div></div>
@@ -218,7 +246,7 @@
               </div>
               <div class="dash-grid">
                 <div>
-                  <div class="dash-panel"><div class="dash-panel-title"><span>▣ &nbsp; آخر الفواتير</span><span>▤</span></div><div class="dash-panel-body"><table class="dash-table"><thead><tr><th>#</th><th>المشتري</th><th>البائع</th><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>${rows.length?rows.map((t,i)=>`<tr><td>${i+1}</td><td>${contactsMap[t.contactId]||'—'}</td><td>${contactsMap[t.secondaryId]||'—'}</td><td>${String(t.date).slice(0,10)}</td><td>${Number(t.amount||0).toLocaleString()}</td><td><span class="dash-status">محفوظة</span></td></tr>`).join(''):`<tr><td colspan="6">لا توجد فواتير بعد</td></tr>`}</tbody></table></div></div>
+                  <div class="dash-panel"><div class="dash-panel-title"><span>▣ &nbsp; آخر الفواتير</span><span>▤</span></div><div class="dash-panel-body"><table class="dash-table"><thead><tr><th>#</th><th>المشتري</th><th>البائع</th><th>التاريخ</th><th>المبلغ</th><th>الحالة</th><th class="no-print">إجراء</th></tr></thead><tbody>${rows.length?rows.map((t,i)=>`<tr><td>${i+1}</td><td>${contactsMap[t.contactId]||'—'}</td><td>${contactsMap[t.secondaryId]||'—'}</td><td>${String(t.date).slice(0,10)}</td><td>${Number(t.amount||0).toLocaleString()}</td><td><span class="dash-status">محفوظة</span></td><td class="no-print">${transactionActionButtons(t.id)}</td></tr>`).join(''):`<tr><td colspan="7">لا توجد فواتير بعد</td></tr>`}</tbody></table></div></div>
                   <div class="dash-panel"><div class="dash-panel-title"><span>▥ &nbsp; مخطط المبيعات الشهرية</span><span>▥</span></div><div class="dash-panel-body"><div class="dash-chart">${months.map(x=>`<div class="dash-bar" style="height:${Math.max(8,Math.round((x.val/max)*100))}%"><span>${x.name}</span></div>`).join('')}</div></div></div>
                 </div>
                 <div class="dash-panel"><div class="dash-panel-title"><span>⚡ &nbsp; أزرار سريعة</span></div><div class="dash-panel-body"><div class="quick-grid">
@@ -256,7 +284,7 @@
             state.invoiceItems.splice(index, 1); renderITable(); document.getElementById('i-qty').focus();
         }
         function renderITable() {
-            document.getElementById('i-body').innerHTML = state.invoiceItems.map((it, i) => `<tr><td>${it.qty}</td><td>${it.price.toFixed(2)}</td><td>${it.buyer}</td><td>${it.seller}</td><td>${it.total.toFixed(2)}</td><td><button class="btn btn-primary btn-sm" onclick="editII(${i})">✏️</button> <button class="btn btn-danger btn-sm" onclick="state.invoiceItems.splice(${i},1);renderITable()">×</button></td></tr>`).join('');
+            document.getElementById('i-body').innerHTML = state.invoiceItems.map((it, i) => `<tr><td>${it.qty}</td><td>${it.price.toFixed(2)}</td><td>${it.buyer}</td><td>${it.seller}</td><td>${it.total.toFixed(2)}</td><td><div class="row-actions"><button type="button" class="btn btn-primary btn-sm" onclick="editII(${i})" title="تعديل السطر" aria-label="تعديل السطر">✏️</button><button type="button" class="btn btn-danger btn-sm" onclick="state.invoiceItems.splice(${i},1);renderITable()" title="حذف السطر" aria-label="حذف السطر">🗑️</button></div></td></tr>`).join('');
         }
         async function saveInv() {
             if(state.invoiceItems.length===0) return;
@@ -311,7 +339,7 @@
                 </div>
                 <div class="card" style="padding:0; overflow:hidden;"><div class="print-only-header"><h2>الفواتير اليومية</h2><span class="date">التاريخ: ${getPrintDate()}</span></div>
                 <table><thead><tr><th>العدد</th><th>السعر</th><th>المشتري</th><th>البائع</th><th>الإجمالي</th><th class="no-print">إجراء</th></tr></thead>
-                <tbody>${filtered.map(t => `<tr><td>${t.details.tQty}</td><td>${(t.details.raw/t.details.tQty).toFixed(2)}</td><td>${cMap[t.contactId]||'؟'}</td><td>${cMap[t.secondaryId]||'؟'}</td><td style="font-weight:bold">${t.details.raw.toFixed(2)}</td><td class="no-print"><button class="btn btn-primary btn-sm" onclick="openEdit(${t.id}, 'tx')">✏️</button> <button class="btn btn-danger btn-sm" onclick="delTx(${t.id})">🗑️</button></td></tr>`).join('')}</tbody>
+                <tbody>${filtered.map(t => `<tr><td>${t.details.tQty}</td><td>${(t.details.raw/t.details.tQty).toFixed(2)}</td><td>${cMap[t.contactId]||'؟'}</td><td>${cMap[t.secondaryId]||'؟'}</td><td style="font-weight:bold">${t.details.raw.toFixed(2)}</td><td class="no-print">${transactionActionButtons(t.id)}</td></tr>`).join('')}</tbody>
                 <tfoot style="background:yellow !important; font-weight:900;">
                     <tr style="background:yellow !important; color:#000;">
                         <td><div class="daily-total-field">العدد: ${tQ}</div></td>
@@ -338,7 +366,7 @@
                     </div>
                     <div style="flex:1; overflow-y:auto; overflow-x:hidden; background:#fff; min-height:0;">
                         <table style="direction:rtl;">
-                            <thead><tr><th class="v-print-hide" style="width:90px;">رقم</th><th class="v-from-head">الاسم</th><th class="v-to-head">الاسم</th><th class="v-print-hide" style="width:150px;">تاريخ</th><th style="width:170px;">المبلغ</th></tr></thead>
+                            <thead><tr><th class="v-print-hide" style="width:90px;">رقم</th><th class="v-from-head">الاسم</th><th class="v-to-head">الاسم</th><th class="v-print-hide" style="width:150px;">تاريخ</th><th style="width:170px;">المبلغ</th><th class="no-print action-column">إجراء</th></tr></thead>
                             <tbody id="v-history-body"></tbody>
                         </table>
                     </div>
@@ -398,7 +426,7 @@
                 const from = type === 'دفع' ? 'الصندوق' : cName;
                 const to = type === 'دفع' ? cName : 'الصندوق';
                 const selected = window.selectedVoucherId === t.id ? 'background:#fde68a !important;' : '';
-                return `<tr style="cursor:pointer;${selected}" onclick="selectVoucher(${t.id},'${type}')"><td class="v-print-hide">${t.voucherNo || filtered.length-idx}</td><td class="${type==='قبض'?'v-customer':'v-print-hide'}">${from}</td><td class="${type==='دفع'?'v-customer':'v-print-hide'}">${to}</td><td class="v-print-hide">${t.date.split('T')[0]}</td><td>${Number(t.amount).toFixed(2)}</td></tr>`;
+                return `<tr style="cursor:pointer;${selected}" onclick="selectVoucher(${t.id},'${type}')"><td class="v-print-hide">${t.voucherNo || filtered.length-idx}</td><td class="${type==='قبض'?'v-customer':'v-print-hide'}">${from}</td><td class="${type==='دفع'?'v-customer':'v-print-hide'}">${to}</td><td class="v-print-hide">${t.date.split('T')[0]}</td><td>${Number(t.amount).toFixed(2)}</td><td class="no-print">${transactionActionButtons(t.id)}</td></tr>`;
             }).join('');
             footer.innerHTML = `<span class="voucher-total-box">العدد: ${filtered.length}</span><span class="voucher-total-box">المجموع: ${totalAmt.toFixed(2)}</span>`;
         }
@@ -511,7 +539,7 @@
                 else if(t.type==='قبض'){amount=Number(t.amount||0);status='قبض';} else if(t.type==='دفع'){amount=Number(t.amount||0);status='دفع';}
                 if(isI) totalQty += Number(qty)||0;
                 totalAmount += amount;
-                body += `<tr ${isI ? `ondblclick="openEdit(${JSON.stringify(t.id)}, 'tx')" title="انقر مرتين لفتح الفاتورة وتعديلها" style="cursor:pointer;"` : ''}><td>${i+1}</td><td>${no}</td><td>${status}</td><td>${qty}</td><td>${price}</td><td>${amount.toFixed(2)}</td><td class="no-print" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="openEdit(${JSON.stringify(t.id)}, 'tx')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deleteStatementDetail(${JSON.stringify(t.id)}, '${date}', '${kind}', ${JSON.stringify(contactId)})">🗑️</button></td></tr>`;
+                body += `<tr ${isI ? `ondblclick="openEdit(${JSON.stringify(t.id)}, 'tx')" title="انقر مرتين لفتح الفاتورة وتعديلها" style="cursor:pointer;"` : ''}><td>${i+1}</td><td>${no}</td><td>${status}</td><td>${qty}</td><td>${price}</td><td>${amount.toFixed(2)}</td><td class="no-print" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><div class="row-actions"><button type="button" class="btn btn-primary btn-sm" onclick="openEdit(${JSON.stringify(t.id)}, 'tx')" title="تعديل المعاملة" aria-label="تعديل المعاملة">✏️</button><button type="button" class="btn btn-danger btn-sm" onclick="deleteStatementDetail(${JSON.stringify(t.id)}, '${date}', '${kind}', ${JSON.stringify(contactId)})" title="حذف المعاملة" aria-label="حذف المعاملة">🗑️</button></div></td></tr>`;
             });
             const title = kind==='بيع'?'تفاصيل المبيعات':kind==='شراء'?'تفاصيل المشتريات':kind==='قبض'?'تفاصيل القبض':kind==='واصل بواسطة الفاتورة'?'تفاصيل واصل بواسطة الفاتورة':'تفاصيل الدفع';
             document.getElementById('modal-title').textContent=`${title} - ${date}`;
@@ -570,13 +598,13 @@
         }
         function drawC() {
             const s = document.getElementById('c-search').value.toLowerCase();
-            document.getElementById('c-body').innerHTML = state.contacts.filter(c => c.name.toLowerCase().includes(s)).map(c => `<tr><td>${c.name}</td><td>${c.phone||'-'}</td><td>${c.address||'-'}</td><td>${c.openingBal.toFixed(2)}</td><td><button class="btn btn-primary btn-sm" onclick="openEdit(${c.id}, 'contact')">✏️</button> <button class="btn btn-danger btn-sm" onclick="delC(${c.id})">🗑️</button></td></tr>`).join('');
+            document.getElementById('c-body').innerHTML = state.contacts.filter(c => c.name.toLowerCase().includes(s)).map(c => `<tr><td>${c.name}</td><td>${c.phone||'-'}</td><td>${c.address||'-'}</td><td>${c.openingBal.toFixed(2)}</td><td>${contactActionButtons(c.id)}</td></tr>`).join('');
         }
 
         function renderBalances(m) {
             m.innerHTML = `<div class="page-header no-print"><div class="page-title">الأرصدة</div><div class="page-actions"><button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ طباعة</button><button class="btn btn-success btn-sm whatsapp-btn" onclick="shareViaWhatsApp('كشف الأرصدة')">🟢 واتساب</button></div></div>
                 <div class="card no-print"><input id="b-search" placeholder="بحث..." oninput="drawB()" style="margin:0;"></div>
-                <div class="card" style="padding:0; overflow:hidden;"><div class="print-only-header"><h2>كشف أرصدة العملاء</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><table><thead><tr><th>الاسم</th><th>تاريخ آخر دفعة</th><th>قيمة آخر دفعة</th><th style="color:red">مدين (عليه)</th><th style="color:green">دائن (له)</th></tr></thead><tbody id="b-body"></tbody><tfoot id="b-foot" class="tfoot-custom"></tfoot></table></div>`;
+                <div class="card" style="padding:0; overflow:hidden;"><div class="print-only-header"><h2>كشف أرصدة العملاء</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><table><thead><tr><th>الاسم</th><th>تاريخ آخر دفعة</th><th>قيمة آخر دفعة</th><th style="color:red">مدين (عليه)</th><th style="color:green">دائن (له)</th><th class="no-print action-column">إجراء</th></tr></thead><tbody id="b-body"></tbody><tfoot id="b-foot" class="tfoot-custom"></tfoot></table></div>`;
             drawB();
         }
         function drawB() {
@@ -586,10 +614,10 @@
             state.transactions.forEach(t => { if(t.type === 'قبض' || t.type === 'دفع') { if(!lastPayMap[t.contactId] || t.date > lastPayMap[t.contactId].date) { lastPayMap[t.contactId] = { date: t.date.split('T')[0], amount: t.amount }; } } });
             document.getElementById('b-body').innerHTML = filtered.map(c => {
                 const lastP = lastPayMap[c.id]; const lastPDate = lastP ? lastP.date : '-'; const lastPAmt = lastP ? lastP.amount.toFixed(2) : '-';
-                return `<tr><td>${c.name}</td><td>${lastPDate}</td><td>${lastPAmt}</td><td style="color:black">${c.balance>0?c.balance.toFixed(2):'-'}</td><td style="color:black">${c.balance<0?Math.abs(c.balance).toFixed(2):'-'}</td></tr>`;
+                return `<tr><td>${c.name}</td><td>${lastPDate}</td><td>${lastPAmt}</td><td style="color:black">${c.balance>0?c.balance.toFixed(2):'-'}</td><td style="color:black">${c.balance<0?Math.abs(c.balance).toFixed(2):'-'}</td><td class="no-print">${contactActionButtons(c.id)}</td></tr>`;
             }).join('');
             const deb = filtered.filter(c=>c.balance>0).reduce((a,b)=>a+b.balance,0), cre = Math.abs(filtered.filter(c=>c.balance<0).reduce((a,b)=>a+b.balance,0));
-            document.getElementById('b-foot').innerHTML = `<tr><td colspan="3">الإجمالي</td><td style="color:white">${deb.toFixed(2)}</td><td style="color:white">${cre.toFixed(2)}</td></tr>`;
+            document.getElementById('b-foot').innerHTML = `<tr><td colspan="3">الإجمالي</td><td style="color:white">${deb.toFixed(2)}</td><td style="color:white">${cre.toFixed(2)}</td><td class="no-print"></td></tr>`;
         }
 
         function renderReports(m) {
@@ -659,18 +687,19 @@
             for(let n in groups) {
                 const g = groups[n];
                 const rows = g.items.map(i=> isS
-                    ? `<tr><td>شراء</td><td>${i.q}</td><td>${i.p.toFixed(2)}</td><td style="font-weight:bold">${i.n.toFixed(2)}</td></tr>`
-                    : `<tr><td>${i.date.split('T')[0]}</td><td>${i.q}</td><td>${i.p.toFixed(2)}</td><td>${i.r.toFixed(2)}</td><td>${i.fd.toFixed(2)}</td><td style="font-weight:bold">${i.n.toFixed(2)}</td></tr>`).join('');
+                    ? `<tr><td>شراء</td><td>${i.q}</td><td>${i.p.toFixed(2)}</td><td style="font-weight:bold">${i.n.toFixed(2)}</td><td class="no-print">${transactionActionButtons(i.id)}</td></tr>`
+                    : `<tr><td>${i.date.split('T')[0]}</td><td>${i.q}</td><td>${i.p.toFixed(2)}</td><td>${i.r.toFixed(2)}</td><td>${i.fd.toFixed(2)}</td><td style="font-weight:bold">${i.n.toFixed(2)}</td><td class="no-print">${transactionActionButtons(i.id)}</td></tr>`).join('');
                 const unpaidItems = g.items.filter(i=>!i.paid);
                 const allPaid = !isS && unpaidItems.length===0 && g.items.length>0;
                 const footExtra = !isS ? `<td class="no-print" style="text-align:center;"><button class="btn btn-sm-tiny ${allPaid?'btn-success':'btn-danger'}" ${allPaid?'disabled':''} style="${allPaid?'background:#16a34a !important;color:white !important;opacity:1;':''}" onclick='payPurchaseGroup(${JSON.stringify(g.items.map(i=>i.id))})'>${allPaid?'تم الواصل ✓':'واصل'}</button></td>` : '';
                 const reportHead = isS
-                    ? '<tr><th>الحركة</th><th>العدد</th><th>السعر</th><th>الصافي</th></tr>'
-                    : '<tr><th>التاريخ</th><th>العدد</th><th>السعر</th><th>المجموع</th><th>الخـصم</th><th>الصافي</th></tr>';
+                    ? '<tr><th>الحركة</th><th>العدد</th><th>السعر</th><th>الصافي</th><th class="no-print">إجراء</th></tr>'
+                    : '<tr><th>التاريخ</th><th>العدد</th><th>السعر</th><th>المجموع</th><th>الخـصم</th><th>الصافي</th><th class="no-print">إجراء</th></tr>';
                 const reportFoot = isS
-                    ? `<tr><td>المجموع</td><td>${g.q}</td><td>-</td><td>${g.n.toFixed(2)}</td></tr>`
+                    ? `<tr><td>المجموع</td><td>${g.q}</td><td>-</td><td>${g.n.toFixed(2)}</td><td class="no-print"></td></tr>`
                     : `<tr><td>المجموع</td><td>${g.q}</td><td>-</td><td>${g.r.toFixed(2)}</td><td>${g.fd.toFixed(2)}</td><td>${g.n.toFixed(2)}</td>${footExtra}</tr>`;
-                html += `<div class="card" style="padding:0; overflow:hidden; margin-bottom:0; display:flex; flex-direction:column; height:100%;"><div class="print-only-header"><h2>تقرير ${isS?'المبيعات':'المشتريات'}</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><div class="group-header"><span>${n}</span></div><div style="flex:1; overflow-y:auto;"><table><thead>${reportHead}</thead><tbody>${rows}</tbody></table></div><table style="margin-top:auto;"><tfoot class="tfoot-yellow">${reportFoot}</tfoot></table></div>`;
+                const groupContact = Object.values(cMap).find(c => c.name === n);
+                html += `<div class="card" style="padding:0; overflow:hidden; margin-bottom:0; display:flex; flex-direction:column; height:100%;"><div class="print-only-header"><h2>تقرير ${isS?'المبيعات':'المشتريات'}</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><div class="group-header"><span>${n}</span>${groupContact ? contactActionButtons(groupContact.id) : ''}</div><div style="flex:1; overflow-y:auto;"><table><thead>${reportHead}</thead><tbody>${rows}</tbody></table></div><table style="margin-top:auto;"><tfoot class="tfoot-yellow">${reportFoot}</tfoot></table></div>`;
             }
             document.getElementById('rep-res').innerHTML = html;
             document.getElementById('global-footer-container').innerHTML = isS
@@ -682,7 +711,15 @@
 
         function renderSettings(m) {
             const s = state.settings; const lk = settLocked ? 'disabled' : ''; const btnCls = settLocked ? 'btn-danger' : 'btn-success'; const btnTxt = settLocked ? '🔒 تعديل الجباية والخصم (مقفل)' : '🔓 تعديل الجباية والخصم (مفتوح)';
+            const fiscalYear = escapeHTML(s.fiscalYear || new Date().getFullYear());
+            const lastBackup = s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString('ar-IQ') : 'لم تُنشأ نسخة بعد';
             m.innerHTML = `<div class="page-header"><div class="page-title">إعدادات النظام</div></div><div class="card" style="max-width:550px; margin:auto;">
+                <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin-bottom:10px;">
+                    <div style="padding:8px; text-align:center; border-radius:10px; background:#f2f3ff; color:#343170;"><small>السنة</small><strong style="display:block; margin-top:3px;">${fiscalYear}</strong></div>
+                    <div style="padding:8px; text-align:center; border-radius:10px; background:#effaf8; color:#176b68;"><small>الأسماء</small><strong style="display:block; margin-top:3px;">${state.contacts.length}</strong></div>
+                    <div style="padding:8px; text-align:center; border-radius:10px; background:#fff7e7; color:#8a5a12;"><small>المعاملات</small><strong style="display:block; margin-top:3px;">${state.transactions.length}</strong></div>
+                </div>
+                <div style="margin-bottom:12px; padding:7px 10px; border-radius:9px; background:#f6f7fa; color:#5c6074; font-size:.78rem;">🛡️ آخر نسخة احتياطية: <strong>${lastBackup}</strong></div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
                     <div><label>المستخدم</label><input id="s-u" value="${s.user}" style="margin:0;"></div>
                     <div><label>كلمة المرور</label><input type="password" id="s-p" value="${s.pass}" style="margin:0;"></div>
@@ -702,12 +739,118 @@
                     <button class="btn btn-primary" style="flex:1" onclick="document.getElementById('imp-f').click()">📥 استيراد نسخة</button>
                     <input type="file" id="imp-f" class="hidden" onchange="importData(event)">
                 </div>
+                <div style="margin-top:14px; padding:12px; border:1px solid #c8c9ef; border-radius:12px; background:linear-gradient(180deg,#f7f7ff,#eceefe);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+                        <strong style="color:#343170;">📅 السنة المالية الحالية</strong>
+                        <span style="padding:4px 12px; border-radius:999px; background:#fff; color:#343170; font-weight:900; box-shadow:inset 0 1px 3px rgba(49,46,99,.18);">${fiscalYear}</span>
+                    </div>
+                    <p style="margin:0 0 10px; color:#555870; font-size:.82rem; line-height:1.6;">ينزّل نسخة كاملة للسنة الحالية، ثم يحتفظ بالأسماء والأرصدة المدورة فقط ويبدأ سجل معاملات جديد.</p>
+                    <button class="btn btn-primary w-full" style="width:100%;" onclick="openFiscalYearModal()">🗓️ حفظ السنة وبدء سنة جديدة</button>
+                </div>
                 <button class="btn btn-danger w-full" style="width:100%; margin-top:10px;" onclick="openWipeLock()">⚠️ مسح شامل للنظام</button>
             </div>`;
         }
         async function saveSett() { state.settings = { ...state.settings, user:document.getElementById('s-u').value, pass:document.getElementById('s-p').value, buyerFee:parseFloat(document.getElementById('s-bf').value)||0, sellerDisc:parseFloat(document.getElementById('s-sd').value)||0, p1:parseFloat(document.getElementById('s-p1').value)||0, p2:parseFloat(document.getElementById('s-p2').value)||0 }; await dbSave("settings", state.settings); alert('تم حفظ الإعدادات'); settLocked = true; renderPage(); }
         
-        function exportData() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(state)], {type:'application/json'})); a.download = `Backup_${new Date().toLocaleDateString()}.json`; a.click(); }
+        function safeFilePart(value) {
+            return String(value || '').trim().replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^-+|-+$/g, '') || 'data';
+        }
+
+        function escapeHTML(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+        }
+
+        function downloadBackupFile(payload, prefix = 'Backup') {
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `${safeFilePart(prefix)}_${stamp}.json`;
+            const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'}));
+            const a = document.createElement('a');
+            a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            return filename;
+        }
+
+        async function exportData() {
+            const exportedAt = new Date().toISOString();
+            const payload = JSON.parse(JSON.stringify(state));
+            payload.settings = { ...payload.settings, lastBackupAt:exportedAt };
+            payload.backupInfo = { type:'manual', exportedAt, fiscalYear:String(state.settings?.fiscalYear || new Date().getFullYear()) };
+            const filename = downloadBackupFile(payload, 'Ghazali_Backup');
+            state.settings = { ...state.settings, lastBackupAt:exportedAt };
+            await dbSave('settings', state.settings);
+            alert(`تم تنزيل النسخة الاحتياطية:\n${filename}`);
+            if(state.activeTab === 'settings') renderPage();
+        }
+
+        function openFiscalYearModal() {
+            const modal = document.getElementById('edit-modal');
+            const content = document.getElementById('modal-content');
+            const actions = modal.querySelector('.modal-box > div:last-child');
+            const currentYear = String(state.settings?.fiscalYear || new Date().getFullYear());
+            const numericYear = /^\d{4}$/.test(currentYear) ? Number(currentYear) : new Date().getFullYear();
+            document.getElementById('modal-title').innerText = 'بدء سنة مالية جديدة';
+            content.innerHTML = `<div style="padding:10px; margin-bottom:12px; border-radius:10px; background:#fff7d6; color:#5d4700; line-height:1.7; font-size:.86rem;">
+                    <strong>ما الذي سيحدث؟</strong><br>
+                    1. تنزيل نسخة كاملة من السنة الحالية.<br>
+                    2. حذف الفواتير والسندات من السنة الجديدة.<br>
+                    3. إبقاء جميع الأسماء، ويصبح الرصيد الحالي هو الرصيد المدور.
+                </div>
+                <label>السنة الجديدة</label><input id="fiscal-new-year" value="${numericYear + 1}" inputmode="numeric">
+                <label>رمز الحماية</label><input type="password" id="fiscal-code" placeholder="أدخل رمز الحماية" autocomplete="off">`;
+            actions.innerHTML = `<button class="btn btn-success" style="flex:1" onclick="startNewFiscalYear()">تنزيل النسخة والبدء</button><button class="btn btn-danger" style="flex:1" onclick="closeModal()">إلغاء</button>`;
+            modal.querySelector('.modal-box').style.width = 'min(460px, calc(100vw - 24px))';
+            window.editId = null; window.editType = 'fiscal-year';
+            modal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('fiscal-new-year')?.focus(), 50);
+        }
+
+        async function startNewFiscalYear() {
+            const currentYear = String(state.settings?.fiscalYear || new Date().getFullYear());
+            const newYear = document.getElementById('fiscal-new-year')?.value.trim();
+            const code = document.getElementById('fiscal-code')?.value || '';
+            if(!newYear) return alert('أدخل اسم أو رقم السنة الجديدة');
+            if(newYear.length > 30 || !/^[\p{L}\p{N}\s._/-]+$/u.test(newYear)) return alert('اسم السنة يجب أن يكون قصيراً ويحتوي على حروف أو أرقام فقط');
+            if(newYear === currentYear) return alert('السنة الجديدة يجب أن تختلف عن السنة الحالية');
+            if(code !== '1001') { const field=document.getElementById('fiscal-code'); if(field){field.value='';field.focus();} return alert('رمز الحماية غير صحيح'); }
+            if(!confirm(`سيتم حفظ نسخة السنة ${currentYear} ثم حذف جميع معاملاتها وبدء السنة ${newYear}. هل تريد المتابعة؟`)) return;
+
+            const closedAt = new Date().toISOString();
+            const archive = JSON.parse(JSON.stringify(state));
+            archive.backupInfo = {
+                type:'fiscal-year-closing',
+                exportedAt:closedAt,
+                closedFiscalYear:currentYear,
+                nextFiscalYear:newYear,
+                contactCount:state.contacts.length,
+                transactionCount:state.transactions.length
+            };
+            const filename = downloadBackupFile(archive, `Ghazali_Closing_${currentYear}`);
+            const carriedContacts = state.contacts.map(contact => {
+                const carriedBalance = Number(contact.balance) || 0;
+                return { ...contact, openingBal:carriedBalance, balance:carriedBalance };
+            });
+            const newSettings = { ...state.settings, fiscalYear:newYear, previousFiscalYear:currentYear, fiscalYearStartedAt:closedAt, lastBackupAt:closedAt };
+
+            try {
+                await new Promise((resolve,reject) => {
+                    const tx = db.transaction(['contacts','transactions','settings'], 'readwrite');
+                    const contactsStore = tx.objectStore('contacts');
+                    contactsStore.clear();
+                    tx.objectStore('transactions').clear();
+                    carriedContacts.forEach(contact => contactsStore.put(contact));
+                    tx.objectStore('settings').put(newSettings);
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(tx.error);
+                });
+                state = { ...state, contacts:carriedContacts, transactions:[], invoiceItems:[], settings:newSettings, activeTab:'dashboard' };
+                closeModal(); renderSidebar(); renderPage(); updateDatalist();
+                alert(`تم بدء السنة المالية ${newYear}.\nتم تنزيل نسخة السنة السابقة باسم:\n${filename}\n\nبقيت الأسماء والأرصدة المدورة فقط.`);
+            } catch(err) {
+                console.error(err);
+                alert(`تعذر بدء السنة الجديدة، ولم تُغيّر البيانات. النسخة الاحتياطية نُزّلت باسم:\n${filename}`);
+            }
+        }
         
         // عند الاستيراد نعيد حساب كل فاتورة من العدد والسعر حسب إعدادات البرنامج الحالية،
         // وليس حسب القيم القديمة الموجودة داخل ملف النسخة المستوردة.
@@ -771,24 +914,51 @@
         async function importData(e) {
             const f = e.target.files[0]; if(!f) return; const r = new FileReader();
             r.onload = async (ev) => {
+                let safetyFilename = '';
                 try {
                     let imported = JSON.parse(ev.target.result);
-                    if(!imported || !Array.isArray(imported.contacts) || !Array.isArray(imported.transactions) || !imported.settings) throw new Error('invalid backup');
-                    const activeSettings = { ...state.settings };
+                    if(!imported || !Array.isArray(imported.contacts) || !Array.isArray(imported.transactions) || !imported.settings || typeof imported.settings !== 'object') throw new Error('invalid backup');
+                    const importedYear = String(imported.settings.fiscalYear || imported.backupInfo?.fiscalYear || 'غير محددة');
+                    const approved = confirm(`سيتم استيراد النسخة التالية:\nالسنة: ${importedYear}\nالأسماء: ${imported.contacts.length}\nالمعاملات: ${imported.transactions.length}\n\nسيتم تنزيل نسخة حماية من بياناتك الحالية أولاً. هل تريد المتابعة؟`);
+                    if(!approved) { e.target.value=''; return; }
+
+                    const safetyAt = new Date().toISOString();
+                    const safetyCopy = JSON.parse(JSON.stringify(state));
+                    safetyCopy.backupInfo = {
+                        type:'pre-import-safety',
+                        exportedAt:safetyAt,
+                        sourceFilename:f.name,
+                        fiscalYear:String(state.settings?.fiscalYear || new Date().getFullYear())
+                    };
+                    safetyFilename = downloadBackupFile(safetyCopy, 'Ghazali_Before_Import');
+
+                    const activeSettings = {
+                        ...state.settings,
+                        fiscalYear: imported.settings.fiscalYear || state.settings.fiscalYear,
+                        previousFiscalYear: imported.settings.previousFiscalYear,
+                        fiscalYearStartedAt: imported.settings.fiscalYearStartedAt,
+                        lastBackupAt:safetyAt
+                    };
                     imported = recalcImportedData(imported, activeSettings);
                     // احتفظ بإعدادات هذا البرنامج الحالية بعد الاستيراد كي تبقى القيم التي اختارها المستخدم هي المعتمدة.
                     imported.settings = activeSettings;
                     await new Promise((resolve,reject)=>{
                         const tx=db.transaction(["contacts","transactions","settings"],"readwrite");
-                        tx.objectStore("contacts").clear(); tx.objectStore("transactions").clear(); tx.objectStore("settings").clear();
+                        const contactsStore=tx.objectStore("contacts"), transactionsStore=tx.objectStore("transactions"), settingsStore=tx.objectStore("settings");
+                        contactsStore.clear(); transactionsStore.clear(); settingsStore.clear();
+                        imported.contacts.forEach(c=>contactsStore.put(c));
+                        imported.transactions.forEach(t=>transactionsStore.put(t));
+                        settingsStore.put(imported.settings);
                         tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); tx.onabort=()=>reject(tx.error);
                     });
                     state = imported;
-                    for(let c of state.contacts) await dbSave("contacts", c);
-                    for(let t of state.transactions) await dbSave("transactions", t);
-                    await dbSave("settings", state.settings);
+                    alert(`تم الاستيراد بنجاح.\nنسخة الحماية من بياناتك السابقة:\n${safetyFilename}`);
                     location.reload();
-                } catch(err) { alert('خطأ في الملف'); }
+                } catch(err) {
+                    console.error(err);
+                    alert(safetyFilename ? `تعذر إكمال الاستيراد، ولم يتم استبدال بياناتك.\nنسخة الحماية محفوظة باسم:\n${safetyFilename}` : 'ملف النسخة غير صالح أو تالف');
+                    e.target.value='';
+                }
             }; r.readAsText(f);
         }
 
@@ -822,11 +992,16 @@
                 const c = id ? state.contacts.find(x=>x.id===id) : { name:'', phone:'', address:'', openingBal:0 }; document.getElementById('modal-title').innerText = id ? 'تعديل اسم' : 'إضافة اسم';
                 content.innerHTML = `<label>الاسم</label><input id="e-c-name" value="${c.name}"><label>الهاتف</label><input id="e-c-phone" value="${c.phone||''}"><label>العنوان</label><input id="e-c-address" value="${c.address||''}"><label>افتتاحي</label><input type="number" id="e-c-open" value="${c.openingBal}">`;
             } else if(type==='tx') {
-                const t = state.transactions.find(x=>x.id===id); if(t?.type==='دفع' && t.details?.sourceInvoiceIds?.length) { alert('واصل بواسطة الفاتورة مرتبط بالفواتير. عدّل الفاتورة نفسها ليتم تحديث الواصل بصورة صحيحة.'); return; } document.getElementById('modal-title').innerText = 'تعديل العملية';
+                const t = state.transactions.find(x=>x.id===id); if(!t) return; if(t.type==='دفع' && t.details?.sourceInvoiceIds?.length) { alert('واصل بواسطة الفاتورة مرتبط بالفواتير. عدّل الفاتورة نفسها ليتم تحديث الواصل بصورة صحيحة.'); return; } document.getElementById('modal-title').innerText = 'تعديل العملية';
+                const txDate = String(t.date || '').split('T')[0] || new Date().toLocaleDateString('en-CA');
                 if(t.type==='فاتورة') {
                     const b = state.contacts.find(x=>x.id===t.contactId), s = state.contacts.find(x=>x.id===t.secondaryId);
-                    content.innerHTML = `<label>العدد</label><input type="number" id="e-qty" value="${t.details.tQty}"><label>السعر</label><input type="number" id="e-price" value="${(t.details.raw/t.details.tQty).toFixed(2)}"><label>المشتري</label><input list="global-contacts-list" id="e-buyer" value="${b.name}" oninput="autoCompleteName(event)"><label>البائع</label><input list="global-contacts-list" id="e-seller" value="${s.name}" oninput="autoCompleteName(event)">`;
-                } else content.innerHTML = `<label>المبلغ</label><input type="number" id="e-amt" value="${t.amount}"><label>ملاحظات</label><input type="text" id="e-note" value="${t.details.notes||''}">`;
+                    if(!b || !s) return alert('تعذر العثور على اسم المشتري أو البائع لهذه الفاتورة.');
+                    content.innerHTML = `<label>التاريخ</label><input type="date" id="e-date" value="${txDate}"><label>العدد</label><input type="number" id="e-qty" value="${t.details.tQty}"><label>السعر</label><input type="number" id="e-price" value="${(t.details.raw/t.details.tQty).toFixed(2)}"><label>المشتري</label><input list="global-contacts-list" id="e-buyer" value="${b.name}" oninput="autoCompleteName(event)"><label>البائع</label><input list="global-contacts-list" id="e-seller" value="${s.name}" oninput="autoCompleteName(event)">`;
+                } else {
+                    const c = state.contacts.find(x=>x.id===t.contactId); if(!c) return alert('تعذر العثور على الاسم المرتبط بهذه المعاملة.');
+                    content.innerHTML = `<label>التاريخ</label><input type="date" id="e-date" value="${txDate}"><label>الاسم</label><input list="global-contacts-list" id="e-tx-name" value="${c.name}" oninput="autoCompleteName(event)"><label>المبلغ</label><input type="number" id="e-amt" value="${t.amount}"><label>ملاحظات</label><input type="text" id="e-note" value="${t.details?.notes||''}">`;
+                }
             } modal.classList.remove('hidden');
         }
 
@@ -844,20 +1019,24 @@
                     const nQ=parseFloat(document.getElementById('e-qty').value), nP=parseFloat(document.getElementById('e-price').value), nBN=document.getElementById('e-buyer').value.trim(), nSN=document.getElementById('e-seller').value.trim();
                     if(!(nQ>0) || !(nP>0) || !nBN || !nSN) return alert('أدخل بيانات صحيحة');
                     const oldB=state.contacts.find(x=>x.id==t.contactId), oldS=state.contacts.find(x=>x.id==t.secondaryId);
+                    if(!oldB || !oldS) return alert('تعذر العثور على الأسماء المرتبطة بهذه الفاتورة.');
                     if(t.details?.purchasePaid) await detachInvoicePayment(t);
                     oldB.balance-=t.amount; oldS.balance+=t.details.sellerCredit;
                     const newB=await findOrCreateC(nBN), newS=await findOrCreateC(nSN), sett=state.settings, nR=nQ*nP;
                     const nFB=nR+(nQ*sett.buyerFee), nFS=nR-(nQ*sett.sellerDisc)-(nR*(sett.p1/100))-((nR-(nR*(sett.p1/100)))*(sett.p2/100));
-                    t.contactId=newB.id; t.secondaryId=newS.id; t.amount=nFB; t.details={...t.details, tQty:nQ, raw:nR, sellerCredit:nFS}; newB.balance+=nFB; newS.balance-=nFS;
+                    const pickedDate=document.getElementById('e-date').value||String(t.date).split('T')[0], oldTime=String(t.date).split('T')[1]||new Date().toTimeString().slice(0,8);
+                    t.contactId=newB.id; t.secondaryId=newS.id; t.date=pickedDate+'T'+oldTime; t.amount=nFB; t.details={...t.details, tQty:nQ, raw:nR, sellerCredit:nFS}; newB.balance+=nFB; newS.balance-=nFS;
                     await dbSave("transactions", t); await dbSave("contacts", newB); await dbSave("contacts", newS);
                     if(oldB.id !== newB.id) await dbSave("contacts", oldB); if(oldS.id !== newS.id) await dbSave("contacts", oldS);
                 } else {
                     if(t.type==='دفع' && t.details?.sourceInvoiceIds?.length) return alert('واصل بواسطة الفاتورة مرتبط بالفواتير ولا يعدل كسند مستقل.');
-                    const nA=parseFloat(document.getElementById('e-amt').value); if(!(nA>0)) return alert('أدخل مبلغاً صحيحاً');
-                    const c=state.contacts.find(x=>x.id==t.contactId); if(!c) return; if(t.type==='قبض') c.balance+=t.amount; else c.balance-=t.amount;
-                    t.amount=nA; t.details=t.details||{}; t.details.notes=document.getElementById('e-note').value;
-                    if(t.type==='قبض') c.balance-=nA; else c.balance+=nA;
-                    await dbSave("transactions", t); await dbSave("contacts", c);
+                    const nA=parseFloat(document.getElementById('e-amt').value), nName=document.getElementById('e-tx-name').value.trim(); if(!(nA>0) || !nName) return alert('أدخل بيانات صحيحة');
+                    const oldC=state.contacts.find(x=>x.id==t.contactId); if(!oldC) return alert('تعذر العثور على الاسم المرتبط بهذه المعاملة.');
+                    if(t.type==='قبض') oldC.balance+=t.amount; else oldC.balance-=t.amount;
+                    const newC=await findOrCreateC(nName), pickedDate=document.getElementById('e-date').value||String(t.date).split('T')[0], oldTime=String(t.date).split('T')[1]||new Date().toTimeString().slice(0,8);
+                    t.contactId=newC.id; t.date=pickedDate+'T'+oldTime; t.amount=nA; t.details=t.details||{}; t.details.notes=document.getElementById('e-note').value;
+                    if(t.type==='قبض') newC.balance-=nA; else newC.balance+=nA;
+                    await dbSave("transactions", t); await dbSave("contacts", newC); if(oldC.id!==newC.id) await dbSave("contacts", oldC);
                 }
             } closeModal(); renderPage();
             if(isSt){ document.getElementById('st-search').value=sn; document.getElementById('st-from').value=sf; document.getElementById('st-to').value=st; drawSt(); }
@@ -885,13 +1064,13 @@
 
         async function delC(id) { 
             const hasTx = state.transactions.some(t=>t.contactId===id||t.secondaryId===id);
-            if(hasTx) { const pass = prompt('هذا الاسم مرتبطة به عمليات. أدخل رمز النظام للحذف النهائي:'); if(pass !== state.settings.pass) { alert('الرمز خاطئ!'); return; } }
-            else { if(!confirm('هل أنت متأكد من الحذف؟')) return; }
+            if(hasTx) { alert('لا يمكن حذف هذا الاسم لأنه مرتبط بمعاملات. احذف معاملاته أولاً حتى تبقى الأرصدة صحيحة.'); return; }
+            if(!confirm('هل أنت متأكد من حذف الاسم؟')) return;
             state.contacts=state.contacts.filter(c=>c.id!==id);
-            const tx = db.transaction("contacts", "readwrite"); tx.objectStore("contacts").delete(id); drawC(); 
+            await dbDelete('contacts',id); renderPage();
         }
 
-        function closeModal() { document.getElementById('edit-modal').classList.add('hidden'); window.editId=null; }
+        function closeModal() { document.getElementById('edit-modal').classList.add('hidden'); window.editId=null; window.editType=null; }
 
         async function findOrCreateC(n) { 
             let c = state.contacts.find(x=>x.name.trim()===n.trim()); 

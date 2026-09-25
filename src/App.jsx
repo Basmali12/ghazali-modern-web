@@ -126,7 +126,28 @@ function AppShell() {
   return (
     <>
       <datalist id="global-contacts-list" />
-      <aside id="sidebar">
+      <button
+        id="nav-toggle"
+        className="nav-toggle no-print"
+        type="button"
+        aria-label="فتح قائمة التبويبات"
+        aria-controls="sidebar"
+        aria-expanded="false"
+        onClick={() => window.toggleSidebar?.()}
+      >
+        <span aria-hidden="true" />
+        <span aria-hidden="true" />
+        <span aria-hidden="true" />
+      </button>
+      <button
+        id="sidebar-backdrop"
+        className="sidebar-backdrop no-print"
+        type="button"
+        aria-label="إغلاق قائمة التبويبات"
+        tabIndex="-1"
+        onClick={() => window.closeSidebar?.()}
+      />
+      <aside id="sidebar" aria-hidden="true">
         <header className="sidebar-header">
           <h1 aria-label="المحاسب K.K">
             <span className="brand-full">المحاسب.K.K</span>

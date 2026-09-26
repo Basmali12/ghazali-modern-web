@@ -125,6 +125,8 @@
         let sidebarIsMobile = sidebarMedia.matches;
         let sidebarIsOpen = !sidebarIsMobile;
         let sidebarIsPinned = true;
+        let pendingPageTimer = 0;
+        let contactsDatalistKey = '';
 
         try { sidebarIsPinned = localStorage.getItem('ghazali-sidebar-pinned') !== 'false'; } catch (_) {}
 
@@ -190,10 +192,28 @@
             }
         }
 
+        function schedulePageRender() {
+            if (pendingPageTimer) clearTimeout(pendingPageTimer);
+            pendingPageTimer = setTimeout(() => {
+                pendingPageTimer = 0;
+                renderPage();
+            }, 0);
+        }
+
+        function focusPrimaryField(id) {
+            if (sidebarIsMobile || window.matchMedia('(pointer: coarse)').matches) return;
+            setTimeout(() => document.getElementById(id)?.focus(), 50);
+        }
+
         function init() { initSidebarControls(); renderSidebar(); navigate('dashboard'); }
         function updateDatalist() {
+            const list = document.getElementById('global-contacts-list');
+            if (!list) return;
+            const nextKey = JSON.stringify(state.contacts.map(c => [c.id, c.name]));
+            if (nextKey === contactsDatalistKey) return;
             const indexedContacts = [...state.contacts].sort((a, b) => a.name.localeCompare(b.name, 'ar', { sensitivity: 'base' }));
-            document.getElementById('global-contacts-list').innerHTML = indexedContacts.map(c => `<option value="${c.name}">`).join('');
+            list.innerHTML = indexedContacts.map(c => `<option value="${c.name}">`).join('');
+            contactsDatalistKey = nextKey;
         }
 
         function renderSidebar() {
@@ -209,22 +229,33 @@
                 { id: 'reports', label: 'التقــــــــــارير', short: 'تقارير', icon: '📊' },
                 { id: 'settings', label: 'إعدادات النظام', short: 'ضبط', icon: '⚙️' }
             ];
-            document.getElementById('nav-menu').innerHTML = menu.map(i => {
-                const isActive = state.activeTab === i.id;
-                return `<button type="button" class="nav-item ${isActive ? 'active' : ''}" data-short="${i.short}" onclick="navigate('${i.id}')" aria-label="${i.label}" title="${i.label}" ${isActive ? 'aria-current="page"' : ''}><span aria-hidden="true">${i.icon}</span><span>${i.label}</span></button>`;
-            }).join('');
+            const nav = document.getElementById('nav-menu');
+            if (!nav.querySelector('.nav-item')) {
+                nav.innerHTML = menu.map(i => `<button type="button" class="nav-item" data-tab="${i.id}" data-short="${i.short}" onclick="navigate('${i.id}')" aria-label="${i.label}" title="${i.label}"><span aria-hidden="true">${i.icon}</span><span>${i.label}</span></button>`).join('');
+            }
+            nav.querySelectorAll('.nav-item').forEach(button => {
+                const isActive = button.dataset.tab === state.activeTab;
+                button.classList.toggle('active', isActive);
+                if (isActive) button.setAttribute('aria-current', 'page');
+                else button.removeAttribute('aria-current');
+            });
         }
 
         function navigate(tab) {
             if (tab === 'settings') {
+                if (pendingPageTimer) {
+                    clearTimeout(pendingPageTimer);
+                    pendingPageTimer = 0;
+                }
                 document.getElementById('settings-lock-modal').classList.remove('hidden');
                 closeSidebarAfterNavigation();
                 return;
             }
+            const isSameTab = state.activeTab === tab;
             state.activeTab = tab;
             renderSidebar();
             closeSidebarAfterNavigation();
-            setTimeout(() => { renderPage(); }, 10);
+            if (!isSameTab) schedulePageRender();
         }
 
         function verifySettingsPass() {
@@ -288,13 +319,20 @@
             const contactsMap={}; state.contacts.forEach(c=>contactsMap[c.id]=c.name);
             const fiscalYear = escapeHTML(state.settings?.fiscalYear || new Date().getFullYear());
             const today=new Date().toLocaleDateString('en-CA');
-            const todaySales=invoices.filter(t=>String(t.date).startsWith(today)).reduce((a,t)=>a+Number(t.amount||0),0);
-            const totalSales=invoices.reduce((a,t)=>a+Number(t.amount||0),0);
-            const totalQty=invoices.reduce((a,t)=>a+Number(t.details?.tQty||0),0);
+            let todaySales=0, totalQty=0;
+            const monthlyTotals = new Map();
+            invoices.forEach(t => {
+                const amount = Number(t.amount||0);
+                const date = String(t.date);
+                const monthKey = date.slice(0,7);
+                if(date.startsWith(today)) todaySales += amount;
+                totalQty += Number(t.details?.tQty||0);
+                monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey)||0) + amount);
+            });
             const deb=state.contacts.reduce((a,c)=>a+(Number(c.balance)>0?Number(c.balance):0),0);
             const rows=invoices.slice(0,5);
             const now=new Date();
-            const months=[]; for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1); const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); const val=invoices.filter(t=>String(t.date).startsWith(key)).reduce((a,t)=>a+Number(t.amount||0),0); months.push({name:d.toLocaleDateString('ar-IQ',{month:'short'}),val});}
+            const months=[]; for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1); const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); const val=monthlyTotals.get(key)||0; months.push({name:d.toLocaleDateString('ar-IQ',{month:'short'}),val});}
             const max=Math.max(...months.map(x=>x.val),1);
             m.innerHTML=`<div class="dashboard-shell">
               <div class="dash-top"><div class="dash-welcome">مرحباً بك في نظام الغزالي للمحاسبة والمخزون <span style="display:inline-block; margin-right:8px; padding:3px 10px; border-radius:999px; background:#eceefe; color:#343170; font-size:.76rem;">السنة المالية: ${fiscalYear}</span></div><div class="dash-date">◷ &nbsp; ${now.toLocaleDateString('en-CA')}<br>${now.toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'})}</div></div>
@@ -328,7 +366,7 @@
                     <button id="btn-add" class="btn btn-primary" onclick="addII()">إضافة</button><button class="btn btn-success" onclick="saveInv()">حفظ الفاتورة</button>
                 </div></div>
                 <div class="card" style="padding:0; overflow:hidden;"><div class="print-only-header"><h2>فاتورة مبيعات</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><table><thead><tr><th>العدد</th><th>السعر</th><th>المشتري</th><th>البائع</th><th>الإجمالي</th><th>إجراء</th></tr></thead><tbody id="i-body"></tbody></table></div>`;
-            renderITable(); setTimeout(() => { document.getElementById('i-qty').focus(); }, 50);
+            renderITable(); focusPrimaryField('i-qty');
         }
         function addII() {
             const q = parseFloat(document.getElementById('i-qty').value), p = parseFloat(document.getElementById('i-price').value), bn = document.getElementById('i-buyer').value, sn = document.getElementById('i-seller').value;
@@ -468,7 +506,7 @@
             </div>`;
             window.selectedVoucherId = null;
             drawVoucherList(type);
-            setTimeout(() => document.getElementById('v-name')?.focus(), 50);
+            focusPrimaryField('v-name');
         }
 
         function drawVoucherList(type) {

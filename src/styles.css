@@ -1656,19 +1656,22 @@ body.dashboard-page .global-footer{display:none!important;}
   #sidebar {
     width: min(300px, 86vw) !important;
     padding: 8px !important;
-    transform: translateX(105%) !important;
+    transform: translate3d(105%, 0, 0) !important;
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
+    will-change: transform;
+    backface-visibility: hidden;
   }
 
   body.sidebar-open #sidebar {
-    transform: translateX(0) !important;
+    transform: translate3d(0, 0, 0) !important;
     opacity: 1 !important;
     visibility: visible !important;
     pointer-events: auto !important;
   }
 
+  .sidebar-backdrop { will-change: opacity; }
   body.sidebar-open .sidebar-backdrop { display: block; }
   body.sidebar-open .sidebar-toggle {
     right: auto !important;

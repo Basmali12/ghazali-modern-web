@@ -121,7 +121,76 @@
             } else alert('بيانات الدخول خاطئة');
         }
 
-        function init() { renderSidebar(); navigate('dashboard'); }
+        const sidebarMedia = window.matchMedia('(max-width: 760px)');
+        let sidebarIsMobile = sidebarMedia.matches;
+        let sidebarIsOpen = !sidebarIsMobile;
+        let sidebarIsPinned = true;
+
+        try { sidebarIsPinned = localStorage.getItem('ghazali-sidebar-pinned') !== 'false'; } catch (_) {}
+
+        function syncSidebarUI() {
+            const body = document.body;
+            const toggle = document.getElementById('sidebar-toggle');
+            const pin = document.getElementById('sidebar-pin');
+            if (!body) return;
+            body.classList.toggle('sidebar-mobile', sidebarIsMobile);
+            body.classList.toggle('sidebar-open', sidebarIsOpen);
+            body.classList.toggle('sidebar-collapsed', !sidebarIsOpen);
+            body.classList.toggle('sidebar-pinned', !sidebarIsMobile && sidebarIsPinned);
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', String(sidebarIsOpen));
+                toggle.setAttribute('aria-label', sidebarIsOpen ? 'إخفاء التبويبات' : 'إظهار التبويبات');
+                toggle.title = sidebarIsOpen ? 'إخفاء التبويبات' : 'إظهار التبويبات';
+                toggle.innerHTML = `<span aria-hidden="true">${sidebarIsOpen ? '×' : '☰'}</span>`;
+            }
+            if (pin) {
+                pin.setAttribute('aria-pressed', String(sidebarIsPinned));
+                pin.setAttribute('aria-label', sidebarIsPinned ? 'إلغاء تثبيت الشريط الجانبي' : 'تثبيت الشريط الجانبي');
+                pin.title = sidebarIsPinned ? 'مثبت: يبقى الشريط ظاهرًا' : 'غير مثبت: يختفي بعد اختيار التبويب';
+                pin.textContent = sidebarIsPinned ? '🔒 مثبت' : '🔓 تلقائي';
+            }
+        }
+
+        function initSidebarControls() {
+            sidebarIsMobile = sidebarMedia.matches;
+            sidebarIsOpen = sidebarIsMobile ? false : sidebarIsPinned;
+            syncSidebarUI();
+            const onSidebarModeChange = (event) => {
+                sidebarIsMobile = event.matches;
+                sidebarIsOpen = sidebarIsMobile ? false : sidebarIsPinned;
+                syncSidebarUI();
+            };
+            if (sidebarMedia.addEventListener) sidebarMedia.addEventListener('change', onSidebarModeChange);
+            else sidebarMedia.addListener(onSidebarModeChange);
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && sidebarIsOpen && sidebarIsMobile) window.closeSidebar();
+            });
+        }
+
+        window.toggleSidebar = function() {
+            sidebarIsOpen = !sidebarIsOpen;
+            syncSidebarUI();
+        };
+        window.closeSidebar = function() {
+            sidebarIsOpen = false;
+            syncSidebarUI();
+        };
+        window.toggleSidebarPin = function() {
+            if (sidebarIsMobile) return;
+            sidebarIsPinned = !sidebarIsPinned;
+            if (sidebarIsPinned) sidebarIsOpen = true;
+            try { localStorage.setItem('ghazali-sidebar-pinned', String(sidebarIsPinned)); } catch (_) {}
+            syncSidebarUI();
+        };
+
+        function closeSidebarAfterNavigation() {
+            if (sidebarIsMobile || !sidebarIsPinned) {
+                sidebarIsOpen = false;
+                syncSidebarUI();
+            }
+        }
+
+        function init() { initSidebarControls(); renderSidebar(); navigate('dashboard'); }
         function updateDatalist() {
             const indexedContacts = [...state.contacts].sort((a, b) => a.name.localeCompare(b.name, 'ar', { sensitivity: 'base' }));
             document.getElementById('global-contacts-list').innerHTML = indexedContacts.map(c => `<option value="${c.name}">`).join('');
@@ -147,8 +216,15 @@
         }
 
         function navigate(tab) {
-            if (tab === 'settings') { document.getElementById('settings-lock-modal').classList.remove('hidden'); return; }
-            state.activeTab = tab; renderSidebar(); setTimeout(() => { renderPage(); }, 10);
+            if (tab === 'settings') {
+                document.getElementById('settings-lock-modal').classList.remove('hidden');
+                closeSidebarAfterNavigation();
+                return;
+            }
+            state.activeTab = tab;
+            renderSidebar();
+            closeSidebarAfterNavigation();
+            setTimeout(() => { renderPage(); }, 10);
         }
 
         function verifySettingsPass() {
@@ -156,6 +232,7 @@
             if (input?.value === '1001') {
                 document.getElementById('settings-lock-modal').classList.add('hidden'); input.value = '';
                 state.activeTab = 'settings'; renderSidebar(); renderPage();
+                closeSidebarAfterNavigation();
                 return true;
             }
             alert('رمز الحماية غير صحيح');

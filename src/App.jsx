@@ -126,12 +126,42 @@ function AppShell() {
   return (
     <>
       <datalist id="global-contacts-list" />
+      <button
+        type="button"
+        id="sidebar-toggle"
+        className="sidebar-toggle no-print"
+        aria-label="إظهار أو إخفاء التبويبات"
+        aria-controls="sidebar"
+        aria-expanded="true"
+        onClick={() => window.toggleSidebar?.()}
+      >
+        <span aria-hidden="true">☰</span>
+      </button>
+      <button
+        type="button"
+        id="sidebar-backdrop"
+        className="sidebar-backdrop no-print"
+        aria-label="إغلاق التبويبات"
+        onClick={() => window.closeSidebar?.()}
+      />
       <aside id="sidebar">
         <header className="sidebar-header">
           <h1 aria-label="نظام الغزالي">
             <span className="brand-full">نظام الغزالي</span>
             <span className="brand-short" aria-hidden="true">الغزالي</span>
           </h1>
+          <div className="sidebar-tools no-print">
+            <button
+              type="button"
+              id="sidebar-pin"
+              className="sidebar-pin"
+              aria-label="تثبيت الشريط الجانبي"
+              aria-pressed="true"
+              onClick={() => window.toggleSidebarPin?.()}
+            >
+              🔒 مثبت
+            </button>
+          </div>
         </header>
         <nav className="nav-menu" id="nav-menu" aria-label="التنقل الرئيسي" />
       </aside>

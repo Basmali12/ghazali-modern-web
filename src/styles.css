@@ -1657,27 +1657,39 @@ body.dashboard-page .global-footer{display:none!important;}
     width: min(300px, 86vw) !important;
     padding: 8px !important;
     transform: translate3d(105%, 0, 0) !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
+    opacity: 1 !important;
+    visibility: visible !important;
     pointer-events: none !important;
     will-change: transform;
     backface-visibility: hidden;
+    contain: layout paint;
+    transition: none !important;
   }
 
-  body.sidebar-open #sidebar {
+  #sidebar.is-open {
     transform: translate3d(0, 0, 0) !important;
-    opacity: 1 !important;
-    visibility: visible !important;
     pointer-events: auto !important;
   }
 
-  .sidebar-backdrop { will-change: opacity; }
-  body.sidebar-open .sidebar-backdrop { display: block; }
-  body.sidebar-open .sidebar-toggle {
+  .sidebar-backdrop {
+    display: block;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    backdrop-filter: none !important;
+    will-change: opacity;
+    transition: none !important;
+  }
+  .sidebar-backdrop.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .sidebar-toggle.is-open {
     right: auto !important;
     left: 10px !important;
   }
-  body.sidebar-collapsed .sidebar-toggle {
+  .sidebar-toggle:not(.is-open) {
     right: 10px !important;
     left: auto !important;
   }

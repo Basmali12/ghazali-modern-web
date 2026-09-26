@@ -133,13 +133,18 @@
         function syncSidebarUI() {
             const body = document.body;
             const toggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
             const pin = document.getElementById('sidebar-pin');
             if (!body) return;
             body.classList.toggle('sidebar-mobile', sidebarIsMobile);
-            body.classList.toggle('sidebar-open', sidebarIsOpen);
-            body.classList.toggle('sidebar-collapsed', !sidebarIsOpen);
+            body.classList.toggle('sidebar-open', !sidebarIsMobile && sidebarIsOpen);
+            body.classList.toggle('sidebar-collapsed', !sidebarIsMobile && !sidebarIsOpen);
             body.classList.toggle('sidebar-pinned', !sidebarIsMobile && sidebarIsPinned);
+            sidebar?.classList.toggle('is-open', sidebarIsMobile && sidebarIsOpen);
+            backdrop?.classList.toggle('is-open', sidebarIsMobile && sidebarIsOpen);
             if (toggle) {
+                toggle.classList.toggle('is-open', sidebarIsMobile && sidebarIsOpen);
                 toggle.setAttribute('aria-expanded', String(sidebarIsOpen));
                 toggle.setAttribute('aria-label', sidebarIsOpen ? 'إخفاء التبويبات' : 'إظهار التبويبات');
                 toggle.title = sidebarIsOpen ? 'إخفاء التبويبات' : 'إظهار التبويبات';

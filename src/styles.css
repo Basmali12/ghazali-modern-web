@@ -1498,13 +1498,39 @@ body.dashboard-page .global-footer{display:none!important;}
   }
 
   .invoice-entry-grid {
-    grid-template-columns: 70px 90px minmax(190px, 240px) minmax(190px, 240px) auto auto !important;
+    grid-template-columns: 70px 90px repeat(4, minmax(190px, 240px)) !important;
     justify-content: start;
   }
 
+  .invoice-entry-grid .btn {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    padding: .4rem .5rem !important;
+    font-size: .85rem !important;
+    line-height: 1.15 !important;
+  }
+
   .report-filters {
-    grid-template-columns: 150px 150px minmax(210px, 300px) auto !important;
+    grid-template-columns: 150px 150px repeat(2, minmax(210px, 300px)) !important;
     justify-content: start;
+  }
+
+  .report-filters > div { min-width: 0; }
+
+  .report-filters > .btn {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    padding: .4rem .5rem !important;
+    font-size: .85rem !important;
+    line-height: 1.15 !important;
   }
 
   #c-search,

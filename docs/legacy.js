@@ -587,7 +587,7 @@
         function renderBalances(m) {
             m.innerHTML = `<div class="page-header no-print"><div class="page-title">الأرصدة</div><div class="page-actions"><button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ طباعة</button><button class="btn btn-success btn-sm whatsapp-btn" onclick="shareViaWhatsApp('كشف الأرصدة')">🟢 واتساب</button></div></div>
                 <div class="card no-print"><input id="b-search" placeholder="بحث..." oninput="drawB()" style="margin:0;"></div>
-                <div class="card" style="padding:0; overflow:hidden;"><div class="print-only-header"><h2>كشف أرصدة العملاء</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><table><thead><tr><th>الاسم</th><th>تاريخ آخر دفعة</th><th>قيمة آخر دفعة</th><th style="color:red">مدين (عليه)</th><th style="color:green">دائن (له)</th><th class="no-print action-column">إجراء</th></tr></thead><tbody id="b-body"></tbody><tfoot id="b-foot" class="tfoot-custom"></tfoot></table></div>`;
+                <div class="card" style="padding:0; overflow:hidden;"><div class="print-only-header"><h2>كشف أرصدة العملاء</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><table><thead><tr><th>الاسم</th><th>تاريخ آخر دفعة</th><th>قيمة آخر دفعة</th><th style="color:red">مدين (عليه)</th><th style="color:green">دائن (له)</th></tr></thead><tbody id="b-body"></tbody><tfoot id="b-foot" class="tfoot-custom"></tfoot></table></div>`;
             drawB();
         }
         function drawB() {
@@ -597,10 +597,10 @@
             state.transactions.forEach(t => { if(t.type === 'قبض' || t.type === 'دفع') { if(!lastPayMap[t.contactId] || t.date > lastPayMap[t.contactId].date) { lastPayMap[t.contactId] = { date: t.date.split('T')[0], amount: t.amount }; } } });
             document.getElementById('b-body').innerHTML = filtered.map(c => {
                 const lastP = lastPayMap[c.id]; const lastPDate = lastP ? lastP.date : '-'; const lastPAmt = lastP ? lastP.amount.toFixed(2) : '-';
-                return `<tr><td>${c.name}</td><td>${lastPDate}</td><td>${lastPAmt}</td><td style="color:black">${c.balance>0?c.balance.toFixed(2):'-'}</td><td style="color:black">${c.balance<0?Math.abs(c.balance).toFixed(2):'-'}</td><td class="no-print">${contactActionButtons(c.id)}</td></tr>`;
+                return `<tr><td>${c.name}</td><td>${lastPDate}</td><td>${lastPAmt}</td><td style="color:black">${c.balance>0?c.balance.toFixed(2):'-'}</td><td style="color:black">${c.balance<0?Math.abs(c.balance).toFixed(2):'-'}</td></tr>`;
             }).join('');
             const deb = filtered.filter(c=>c.balance>0).reduce((a,b)=>a+b.balance,0), cre = Math.abs(filtered.filter(c=>c.balance<0).reduce((a,b)=>a+b.balance,0));
-            document.getElementById('b-foot').innerHTML = `<tr><td colspan="3">الإجمالي</td><td style="color:white">${deb.toFixed(2)}</td><td style="color:white">${cre.toFixed(2)}</td><td class="no-print"></td></tr>`;
+            document.getElementById('b-foot').innerHTML = `<tr><td colspan="3">الإجمالي</td><td style="color:white">${deb.toFixed(2)}</td><td style="color:white">${cre.toFixed(2)}</td></tr>`;
         }
 
         function renderReports(m) {
@@ -681,8 +681,7 @@
                 const reportFoot = isS
                     ? `<tr><td>المجموع</td><td>${g.q}</td><td>-</td><td>${g.n.toFixed(2)}</td><td class="no-print"></td></tr>`
                     : `<tr><td>المجموع</td><td>${g.q}</td><td>-</td><td>${g.r.toFixed(2)}</td><td>${g.fd.toFixed(2)}</td><td>${g.n.toFixed(2)}</td>${footExtra}</tr>`;
-                const groupContact = Object.values(cMap).find(c => c.name === n);
-                html += `<div class="card" style="padding:0; overflow:hidden; margin-bottom:0; display:flex; flex-direction:column; height:100%;"><div class="print-only-header"><h2>تقرير ${isS?'المبيعات':'المشتريات'}</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><div class="group-header"><span>${n}</span>${groupContact ? contactActionButtons(groupContact.id) : ''}</div><div style="flex:1; overflow-y:auto;"><table><thead>${reportHead}</thead><tbody>${rows}</tbody></table></div><table style="margin-top:auto;"><tfoot class="tfoot-yellow">${reportFoot}</tfoot></table></div>`;
+                html += `<div class="card" style="padding:0; overflow:hidden; margin-bottom:0; display:flex; flex-direction:column; height:100%;"><div class="print-only-header"><h2>تقرير ${isS?'المبيعات':'المشتريات'}</h2><span class="date">التاريخ: ${getPrintDate()}</span></div><div class="group-header"><span>${n}</span></div><div style="flex:1; overflow-y:auto;"><table><thead>${reportHead}</thead><tbody>${rows}</tbody></table></div><table style="margin-top:auto;"><tfoot class="tfoot-yellow">${reportFoot}</tfoot></table></div>`;
             }
             document.getElementById('rep-res').innerHTML = html;
             document.getElementById('global-footer-container').innerHTML = isS

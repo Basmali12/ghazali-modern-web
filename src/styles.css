@@ -1772,8 +1772,74 @@ body.dashboard-page .global-footer{display:none!important;}
   .dash-card-icon { width: 38px; height: 38px; flex-basis: 38px; font-size: 20px; }
   .dash-card-label { font-size: 10px; }
   .dash-card-value { font-size: 16px; }
-  .dash-panel-body { overflow-x: auto; }
-  .dash-table { min-width: 620px; }
+  body.dashboard-page #main { overflow-x: hidden !important; }
+  .dashboard-shell,
+  .dash-grid,
+  .dash-grid > div,
+  .dash-panel,
+  .dash-panel-body {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .dash-panel-body { overflow-x: hidden; }
+  .dash-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+  }
+  .dash-table th,
+  .dash-table td {
+    padding: 3px 2px !important;
+    font-size: 9px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dash-table th:nth-child(3),
+  .dash-table td:nth-child(3),
+  .dash-table th:nth-child(4),
+  .dash-table td:nth-child(4),
+  .dash-table th:nth-child(6),
+  .dash-table td:nth-child(6) { display: none; }
+  .dash-table th:nth-child(1) { width: 9%; }
+  .dash-table th:nth-child(2) { width: 31%; }
+  .dash-table th:nth-child(5) { width: 27%; }
+  .dash-table th:nth-child(7) { width: 33%; }
+  .dash-table .row-actions { gap: 3px; }
+  .dash-table .row-actions .btn {
+    min-width: 28px !important;
+    width: 28px !important;
+    padding-inline: 2px !important;
+  }
+  .dash-chart {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 142px;
+    gap: 2px;
+    padding: 10px 3px 28px;
+  }
+  .dash-bar { min-width: 0; }
+  .dash-bar span {
+    margin-top: 7px;
+    font-size: 7px;
+    transform: translateX(50%) rotate(-42deg);
+    transform-origin: top center;
+  }
+  .quick-grid {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+  button.quick-btn {
+    width: 100%;
+    min-width: 0;
+    height: 62px;
+    padding-inline: 4px;
+    font-size: 11px;
+  }
+  button.quick-btn b { font-size: 20px; line-height: 22px; }
 
   .modal-box,
   .login-box {
